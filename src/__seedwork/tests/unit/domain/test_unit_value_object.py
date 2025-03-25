@@ -1,58 +1,113 @@
-from dataclasses import FrozenInstanceError, is_dataclass
+import unittest
+from abc import ABC
+from __seedwork.domain.validators import ValidatorRules
+from __seedwork.domain.exceptions import ValidationException
+from dataclasses import is_dataclass
 import unittest
 from unittest.mock import patch
 import uuid
-from __seedwork.domain.value_objects import UniqueEntityId
-from __seedwork.domain.exceptions import InvalidUuidException
 
 
-class TestUniqueEntityId(unittest.TestCase):
+class TestValidatorRules(unittest.TestCase):
+    def setUp(self):
+        self.validator = ValidatorRules.values("value 1", "prop 1")
+        self.invalid_data = [
+            {
+                "value_required": None,
+                "value_string": True,
+                "value_max_length": "Testing",
+                "prop_default": "prop 1",
+                "prop_bool": "prop_bool 1",
+                "value_bool": 5,
+            },
+            {
+                "value_required": None,
+                "value_string": 10,
+                "value_max_length": "Testing",
+                "prop_default": "prop 2",
+                "prop_bool": "prop_bool 2",
+                "value_bool": "not boolean",
+            },
+        ]
 
-    def test_if_is_dataclass(self):
-        self.assertTrue(is_dataclass(UniqueEntityId))
+    def test_values_method(self):
+        self.assertIsInstance(self.validator, ValidatorRules)
+        self.assertEqual(self.validator.value, "value 1")
+        self.assertEqual(self.validator.prop, "prop 1")
 
-    def test_throw_exception_when_uuid_is_invalid(self):
-        with patch.object(
-            UniqueEntityId,
-            "_UniqueEntityId__validate",
-            autospec=True,
-            side_effect=UniqueEntityId._UniqueEntityId__validate,
-        ) as mock_validate:
-            with self.assertRaises(InvalidUuidException) as assert_error:
-                UniqueEntityId("Invalid id")
-        mock_validate.assert_called_once()
-        self.assertEqual(assert_error.exception.args[0], "Id must be a valid UUID")
+    def test_required_rule(self):
+        for item in self.invalid_data:
+            with self.assertRaises(ValidationException) as exception:
+                ValidatorRules.values(
+                    item["value_required"], item["prop_default"]
+                ).required()
 
-    def test_accept_uuid_when_passed_in_constructor(self):
-        with patch.object(
-            UniqueEntityId,
-            "_UniqueEntityId__validate",
-            autospec=True,
-            side_effect=UniqueEntityId._UniqueEntityId__validate,
-        ) as mock_validate:
-            with self.assertRaises(InvalidUuidException):
-                UniqueEntityId("invalid id")
-        value_object = UniqueEntityId("bbeb03a4-d8f6-4df8-af2c-2620acf9b191")
-        mock_validate.assert_called_once()
-        self.assertEqual("bbeb03a4-d8f6-4df8-af2c-2620acf9b191", value_object.id)
+        self.assertEqual(
+            f"Property {item['prop_default']} is required",
+            str(exception.exception.args[0]),
+        )
 
-    def test_uuid_as_string_when_is_created(self):
-        uuid_value = uuid.uuid4()
-        value_object = UniqueEntityId(uuid_value)
-        self.assertEqual(value_object.id, str(uuid_value))
+    def test_boolean_rule(self):
+        for item in self.invalid_data:
+            with self.assertRaises(ValidationException) as exception:
+                ValidatorRules.values(item["value_bool"], item["prop_bool"]).boolean()
+        self.assertEqual(
+            f"Property {item['prop_bool']} must be a boolean",
+            str(exception.exception.args[0]),
+        )
 
-    def test_generate_id_when_no_passed_id_in_constructor(self):
-        with patch.object(
-            UniqueEntityId,
-            "_UniqueEntityId__validate",
-            autospec=True,
-            side_effect=UniqueEntityId._UniqueEntityId__validate,
-        ) as mock_validate:
-            value_object = UniqueEntityId()
-            uuid.UUID(value_object.id)
-            mock_validate.assert_called_once()
+    def test_string_rule(self):
+        for item in self.invalid_data:
+            with self.assertRaises(ValidationException) as exception:
+                ValidatorRules.values(
+                    item["value_string"], item["prop_default"]
+                ).string()
 
-    def test_if_value_object_is_immutable(self):
-        with self.assertRaises(FrozenInstanceError):
-            value_object = UniqueEntityId()
-            value_object.id = "Invalid id"
+        self.assertEqual(
+            f"Property {item['prop_default']} must be a string",
+            str(exception.exception.args[0]),
+        )
+
+    def test_rules_in_sequence(self):
+        for item in self.invalid_data:
+            with self.assertRaises(ValidationException) as exception:
+                ValidatorRules.values(
+                    item["value_required"], item["prop_default"]
+                ).required().string()
+
+            self.assertEqual(
+                f"Property {item['prop_default']} is required",
+                str(exception.exception.args[0]),
+            )
+        for item in self.invalid_data:
+            with self.assertRaises(ValidationException) as exception:
+                ValidatorRules.values(
+                    item["value_max_length"], item["prop_default"]
+                ).required().string().max_length(5)
+
+            self.assertEqual(
+                f"Property {item['prop_default']} must be less than 5 chars",
+                str(exception.exception.args[0]),
+            )
+
+        for item in self.invalid_data:
+            with self.assertRaises(ValidationException) as exception:
+                ValidatorRules.values(
+                    item["value_string"], item["prop_default"]
+                ).required().string()
+
+            self.assertEqual(
+                f"Property {item['prop_default']} must be a string",
+                str(exception.exception.args[0]),
+            )
+
+        for item in self.invalid_data:
+            with self.assertRaises(ValidationException) as exception:
+                ValidatorRules.values(
+                    item["value_bool"], item["prop_bool"]
+                ).required().boolean()
+
+            self.assertEqual(
+                f"Property {item['prop_bool']} must be a boolean",
+                str(exception.exception.args[0]),
+            )
