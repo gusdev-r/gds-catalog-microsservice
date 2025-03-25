@@ -42,5 +42,4 @@ class TestCategory(unittest.TestCase):
 
     def test_if_category_is_immutable(self):
         with self.assertRaises(FrozenInstanceError):
-            category = Category(name="Immutable Movie")
-            category.is_active = False
+            self.category.is_active = False
