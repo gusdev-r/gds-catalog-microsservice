@@ -32,6 +32,8 @@ class Category(Entity):
 
     @classmethod
     def validate(cls, name: str, description: str, is_active: bool = None):
-        ValidatorRules.values(value=name, prop="name").required().max_length(255)
+        ValidatorRules.values(value=name, prop="name").required().string().max_length(
+            255
+        )
         ValidatorRules.values(value=description, prop="description").string()
         ValidatorRules.values(value=is_active, prop="is_active").boolean()
