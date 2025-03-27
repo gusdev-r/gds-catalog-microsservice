@@ -21,6 +21,7 @@ class Category(Entity):
         return super(Category, cls).__new__(cls)
 
     def update(self, name: str, description: str):
+        self.validate(name, description)
         self._set("name", name)
         self._set("description", description)
 
